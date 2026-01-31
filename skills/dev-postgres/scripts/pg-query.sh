@@ -241,8 +241,6 @@ if [[ -n "$DB_SCHEMAS" && "$DB_SCHEMAS" != "null" ]]; then
   PREAMBLE+=" SET search_path TO $SCHEMA_PATH;"
 fi
 
-FULL_QUERY="$PREAMBLE $FINAL_QUERY"
-
 # --- Logging ---
 if [[ "$LOG_QUERIES" == "true" ]]; then
   LOG_DIR="$(dirname "$CONFIG_FILE")"
@@ -251,7 +249,10 @@ if [[ "$LOG_QUERIES" == "true" ]]; then
 fi
 
 # --- Build psql command ---
-PSQL_ARGS=(-h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -v ON_ERROR_STOP=1 --no-psqlrc)
+# Combine preamble + query into single command string
+FULL_QUERY="$PREAMBLE $FINAL_QUERY"
+
+PSQL_ARGS=(-h "$DB_HOST" -p "$DB_PORT" -d "$DB_NAME" -v ON_ERROR_STOP=1 --no-psqlrc -q)
 if [[ -n "$DB_USER" ]]; then
   PSQL_ARGS+=(-U "$DB_USER")
 fi

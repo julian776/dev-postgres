@@ -56,9 +56,9 @@ fi
 normalize_sql() {
   local sql="$1"
   # Remove single-line comments
-  sql=$(echo "$sql" | sed 's/--.*$//' )
-  # Remove multi-line comments (simple, non-nested)
-  sql=$(echo "$sql" | sed ':a;s|/\*[^*]*\*/||g;ta')
+  sql=$(echo "$sql" | sed 's/--.*$//')
+  # Remove multi-line comments (simple, non-nested) — compatible with BSD sed
+  sql=$(echo "$sql" | perl -pe 's|/\*.*?\*/||gs' 2>/dev/null || echo "$sql" | sed 's|/\*[^*]*\*/||g')
   # Collapse whitespace
   sql=$(echo "$sql" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/^ *//;s/ *$//')
   # Uppercase
