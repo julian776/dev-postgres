@@ -1,0 +1,40 @@
+{
+  "connections": {
+    "dev": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "myapp_dev",
+      "user": "dev_user",
+      "password": "${DEV_POSTGRES_PASSWORD}",
+      "mode": "read-write",
+      "sslmode": "prefer"
+    },
+    "staging": {
+      "host": "staging-db.example.com",
+      "port": 5432,
+      "database": "myapp_staging",
+      "user": "staging_readonly",
+      "password": "${STAGING_POSTGRES_PASSWORD}",
+      "mode": "read-only",
+      "sslmode": "require"
+    },
+    "prod": {
+      "host": "prod-db.example.com",
+      "port": 5432,
+      "database": "myapp_prod",
+      "user": "readonly_user",
+      "password": "${PROD_POSTGRES_PASSWORD}",
+      "mode": "read-only",
+      "sslmode": "require",
+      "schemas": ["public", "analytics"]
+    }
+  },
+  "default_connection": "dev",
+  "security": {
+    "block_direct_access": true,
+    "require_confirmation_for_destructive": true,
+    "log_all_queries": true,
+    "max_rows": 1000,
+    "query_timeout_seconds": 30
+  }
+}
