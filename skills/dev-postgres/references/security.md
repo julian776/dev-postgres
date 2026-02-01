@@ -56,6 +56,21 @@ This prevents runaway queries from consuming database resources. Default: 30 sec
 
 When `require_confirmation_for_destructive` is enabled (default), operations like DROP TABLE, TRUNCATE, and DELETE without WHERE require an explicit `--confirm` flag. This provides a human-in-the-loop checkpoint for irreversible operations.
 
+**Per-connection override:** Each connection can set `"require_confirmation": false` to disable confirmation for that connection only, overriding the global setting. This is useful for local dev databases where confirmation adds friction:
+
+```json
+{
+  "connections": {
+    "dev": {
+      "mode": "read-write",
+      "require_confirmation": false
+    }
+  }
+}
+```
+
+The precedence is: connection-level `require_confirmation` > global `require_confirmation_for_destructive` > default (`true`).
+
 ## Password Security
 
 - Passwords in `.dev-postgres.json` use `${ENV_VAR}` syntax and are resolved at runtime

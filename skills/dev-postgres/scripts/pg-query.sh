@@ -174,10 +174,18 @@ fi
 # --- Security settings ---
 SECURITY_JSON=$(jq -r '.security // {}' "$CONFIG_FILE")
 BLOCK_DIRECT=$(echo "$SECURITY_JSON" | jq -r '.block_direct_access // true')
-REQUIRE_CONFIRM=$(echo "$SECURITY_JSON" | jq -r '.require_confirmation_for_destructive // true')
+REQUIRE_CONFIRM_GLOBAL=$(echo "$SECURITY_JSON" | jq -r '.require_confirmation_for_destructive // true')
 LOG_QUERIES=$(echo "$SECURITY_JSON" | jq -r '.log_all_queries // true')
 MAX_ROWS=$(echo "$SECURITY_JSON" | jq -r '.max_rows // 1000')
 QUERY_TIMEOUT=$(echo "$SECURITY_JSON" | jq -r '.query_timeout_seconds // 30')
+
+# Per-connection require_confirmation overrides the global setting
+REQUIRE_CONFIRM_CONN=$(echo "$CONN_JSON" | jq -r '.require_confirmation // empty')
+if [[ -n "$REQUIRE_CONFIRM_CONN" ]]; then
+  REQUIRE_CONFIRM="$REQUIRE_CONFIRM_CONN"
+else
+  REQUIRE_CONFIRM="$REQUIRE_CONFIRM_GLOBAL"
+fi
 
 # --- Query validation ---
 VALIDATE_ARGS=(--query "$QUERY" --mode "$DB_MODE")

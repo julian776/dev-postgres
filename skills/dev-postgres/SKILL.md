@@ -114,7 +114,7 @@ All schema commands accept `--connection`, `--format`, and `--schema` options.
 
 1. **Never run `psql`, `pg_dump`, `pgcli`, or any PostgreSQL CLI tool directly.** The security hook will block it.
 2. **Respect connection modes.** Read-only connections reject all write operations.
-3. **Destructive operations** (DROP, TRUNCATE, DELETE without WHERE) require the `--confirm` flag.
+3. **Destructive operations** (DROP, TRUNCATE, DELETE without WHERE) require the `--confirm` flag unless the connection has `"require_confirmation": false` or the global `require_confirmation_for_destructive` is `false`.
 4. **SELECT queries** automatically get a LIMIT applied based on `max_rows` config (default 1000). Add an explicit LIMIT if you need different behavior.
 5. **Passwords** are resolved from environment variables at runtime — never hardcode them.
 
