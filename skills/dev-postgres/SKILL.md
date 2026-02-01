@@ -1,6 +1,12 @@
 ---
 name: dev-postgres
-description: Secure PostgreSQL access with named connections, read/write enforcement, and defense-in-depth security
+description: >
+  Secure PostgreSQL database access for developers and AI agents.
+  Use when users ask to query databases, inspect schemas, list tables,
+  run SQL, check database structure, or explore data.
+  Trigger phrases include "query the database", "show me the schema",
+  "list tables", "run SQL", "check the data", "how many rows",
+  "describe the table", or any database interaction request.
 hooks:
   - type: PreToolUse
     matcher: Bash
@@ -14,6 +20,26 @@ allowed-tools:
 # PostgreSQL Database Access
 
 You have access to PostgreSQL databases through secure wrapper scripts. **Never use `psql` or other PostgreSQL CLI tools directly** — always use the wrapper scripts below. Direct access is blocked by a security hook.
+
+## Recommended Workflow
+
+Follow this pattern when exploring a database:
+
+1. **Discover** — Start with schema inspection to understand the structure
+2. **Query** — Write focused queries based on what you learned
+3. **Observe** — Check the results and refine
+4. **Repeat** — Narrow down or expand based on findings
+
+```bash
+# 1. Discover: What tables exist?
+bash skills/dev-postgres/scripts/pg-schema.sh --action list-tables
+
+# 2. Discover: What does a table look like?
+bash skills/dev-postgres/scripts/pg-schema.sh --action describe --table users
+
+# 3. Query: Get the data you need
+bash skills/dev-postgres/scripts/pg-query.sh --query "SELECT id, name, email FROM users WHERE active = true LIMIT 10"
+```
 
 ## Configuration
 

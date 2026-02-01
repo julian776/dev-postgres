@@ -1,0 +1,21 @@
+{
+  "name": "dev-postgres-marketplace",
+  "owner": {
+    "name": "Julian Alvarez",
+    "email": ""
+  },
+  "plugins": [
+    {
+      "name": "dev-postgres",
+      "source": "./",
+      "description": "Secure PostgreSQL access with named connections, read/write enforcement, and defense-in-depth security",
+      "strict": false,
+      "keywords": ["postgres", "postgresql", "database", "sql", "query"],
+      "skills": ["./skills/dev-postgres"]
+    }
+  ],
+  "metadata": {
+    "description": "Marketplace for the dev-postgres skill",
+    "version": "1.0.0"
+  }
+}
