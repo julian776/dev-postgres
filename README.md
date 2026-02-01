@@ -64,6 +64,8 @@ Every query passes through 5 independent security layers:
 4. **Timeout** — `SET statement_timeout` prevents runaway queries
 5. **Confirmation** — Destructive operations (DROP, TRUNCATE) require explicit `--confirm`
 
+> **Important:** These layers are defense-in-depth. For production databases, enforce read-only at the database level by connecting to a **read replica** (strongest — physically cannot accept writes) or using a **read-only PostgreSQL user** with only SELECT privileges. See [templates/setup-roles.sql](skills/dev-postgres/templates/setup-roles.sql) for a ready-to-use role template.
+
 See [references/security.md](skills/dev-postgres/references/security.md) for details.
 
 ## License

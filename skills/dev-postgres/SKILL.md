@@ -117,6 +117,7 @@ All schema commands accept `--connection`, `--format`, and `--schema` options.
 3. **Destructive operations** (DROP, TRUNCATE, DELETE without WHERE) require the `--confirm` flag unless the connection has `"require_confirmation": false` or the global `require_confirmation_for_destructive` is `false`.
 4. **SELECT queries** automatically get a LIMIT applied based on `max_rows` config (default 1000). Add an explicit LIMIT if you need different behavior.
 5. **Passwords** are resolved from environment variables at runtime — never hardcode them.
+6. **Production databases must enforce read-only at the database level** — either connect to a read replica (strongest guarantee, physically cannot accept writes) or use a PostgreSQL user with only SELECT privileges. The skill's read-only enforcement is defense-in-depth, not a replacement for database-level constraints.
 
 ## Connection Switching
 

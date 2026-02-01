@@ -60,15 +60,24 @@ The skill scripts check for required dependencies at runtime and provide specifi
 
 ## Setup
 
-1. **Copy the config template** to your project root:
+1. **Ensure read-only access at the database level** (critical for production/staging):
+
+   The skill's read-only mode is defense-in-depth — the real guarantee must come from the database:
+
+   - **Preferred: Connect to a read replica.** Read replicas are physically incapable of accepting writes. This is the strongest guarantee available.
+   - **Alternative: Use a read-only database user.** Create a PostgreSQL role with only `SELECT` privileges. See `templates/setup-roles.sql` for a ready-to-use template.
+
+   Either approach ensures that no software bug, misconfiguration, or bypassed layer can result in accidental writes to production.
+
+2. **Copy the config template** to your project root:
 
    ```bash
    cp skills/dev-postgres/templates/config-example.json .dev-postgres.json
    ```
 
-2. **Edit `.dev-postgres.json`** with your connection details. Use `${ENV_VAR}` syntax for passwords.
+3. **Edit `.dev-postgres.json`** with your connection details. Use `${ENV_VAR}` syntax for passwords. For production connections, point the host to your read replica or use the read-only user credentials.
 
-3. **Set environment variables** for passwords:
+4. **Set environment variables** for passwords:
 
    ```bash
    export DEV_POSTGRES_PASSWORD="your_dev_password"
@@ -77,16 +86,12 @@ The skill scripts check for required dependencies at runtime and provide specifi
 
    Consider adding these to your shell profile or using a tool like `direnv`.
 
-4. **Add to `.gitignore`**:
+5. **Add to `.gitignore`**:
 
    ```
    .dev-postgres.json
    .dev-postgres-query.log
    ```
-
-5. **Set up database roles** (recommended):
-
-   Review and run `skills/dev-postgres/templates/setup-roles.sql` against your databases to create appropriately scoped roles.
 
 6. **Make scripts executable**:
 
