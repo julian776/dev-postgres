@@ -212,28 +212,6 @@ Every query passes through 5 independent security layers:
 
 ## Troubleshooting
 
-### "psql: command not found"
-
-Install the PostgreSQL client:
-
-```bash
-# macOS
-brew install libpq && brew link --force libpq
-
-# Ubuntu/Debian
-sudo apt-get install postgresql-client
-```
-
-### "jq: command not found"
-
-```bash
-# macOS
-brew install jq
-
-# Ubuntu/Debian
-sudo apt-get install jq
-```
-
 ### "Connection refused" or "could not connect"
 
 1. Verify the database is running
