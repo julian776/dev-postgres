@@ -246,12 +246,6 @@ sudo apt-get install jq
 2. Ensure the password matches the database user
 3. Check that `${ENV_VAR}` syntax in config matches your export
 
-### "Permission denied" on scripts
-
-```bash
-chmod +x skills/dev-postgres/scripts/*.sh
-```
-
 ---
 
 ## Features
