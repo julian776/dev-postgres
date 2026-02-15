@@ -86,12 +86,30 @@ WRITE_PATTERNS=(
   '^[[:space:]]*COMMENT[[:space:]]'
   '^[[:space:]]*SECURITY[[:space:]]'
   '^[[:space:]]*DO[[:space:]]'
+  # EXPLAIN ANALYZE actually executes the statement — treat as write if it wraps a write
+  '^[[:space:]]*EXPLAIN[[:space:]]+ANALYZE[[:space:]]'
+  # SET/RESET can disable security settings (e.g. default_transaction_read_only)
+  '^[[:space:]]*SET[[:space:]]'
+  '^[[:space:]]*RESET[[:space:]]'
+)
+
+# Patterns for writes that can appear anywhere in the query (e.g. inside CTEs)
+# These are checked against the entire normalized SQL, not per-statement.
+EMBEDDED_WRITE_PATTERNS=(
+  # Writes inside CTEs: WITH ... AS (INSERT/UPDATE/DELETE ...)
+  'AS[[:space:]]*\([[:space:]]*(INSERT|UPDATE|DELETE)[[:space:]]'
 )
 
 # Also check for writes inside multi-statement strings (split on ;)
 is_write_query() {
   local sql="$1"
-  # Check each statement separated by semicolons
+  # First: check for embedded writes (e.g. inside CTEs) across the full query
+  for pattern in "${EMBEDDED_WRITE_PATTERNS[@]}"; do
+    if echo "$sql" | grep -qE "$pattern"; then
+      return 0
+    fi
+  done
+  # Then: check each statement separated by semicolons
   local IFS=';'
   for stmt in $sql; do
     # Trim leading whitespace

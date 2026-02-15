@@ -118,6 +118,16 @@ if ! jq empty "$CONFIG_FILE" 2>/dev/null; then
   exit 3
 fi
 
+# Warn if config file is world-readable (may contain sensitive connection details)
+if [[ "$(uname)" == "Darwin" ]]; then
+  FILE_PERMS=$(stat -f '%Lp' "$CONFIG_FILE" 2>/dev/null || true)
+else
+  FILE_PERMS=$(stat -c '%a' "$CONFIG_FILE" 2>/dev/null || true)
+fi
+if [[ -n "$FILE_PERMS" ]] && [[ "${FILE_PERMS: -1}" != "0" ]]; then
+  echo "Warning: Config file $CONFIG_FILE is readable by others (permissions: $FILE_PERMS). Consider: chmod 600 $CONFIG_FILE" >&2
+fi
+
 # Resolve connection name
 if [[ -z "$CONNECTION" ]]; then
   CONNECTION=$(jq -r '.default_connection // empty' "$CONFIG_FILE")
@@ -243,9 +253,19 @@ PREAMBLE+="SET statement_timeout = '${TIMEOUT_MS}ms';"
 if [[ "$DB_MODE" == "read-only" ]]; then
   PREAMBLE+=" SET default_transaction_read_only = ON;"
 fi
-# Schema search path
+# Schema search path — validate each schema name to prevent injection
 if [[ -n "$DB_SCHEMAS" && "$DB_SCHEMAS" != "null" ]]; then
   SCHEMA_PATH=$(echo "$CONN_JSON" | jq -r '.schemas | join(", ")')
+  # Validate each schema name is a safe SQL identifier
+  IFS=',' read -ra SCHEMA_PARTS <<< "$SCHEMA_PATH"
+  for schema_part in "${SCHEMA_PARTS[@]}"; do
+    # Trim whitespace
+    schema_part=$(echo "$schema_part" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    if [[ ! "$schema_part" =~ ^[a-zA-Z_][a-zA-Z0-9_\$]*$ ]]; then
+      echo "Error: Invalid schema name in config: '$schema_part' (must be a valid SQL identifier)" >&2
+      exit 3
+    fi
+  done
   PREAMBLE+=" SET search_path TO $SCHEMA_PATH;"
 fi
 

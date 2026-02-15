@@ -96,6 +96,44 @@ assert_exit "Mixed case SELECT allowed" 0 \
   --query "Select * From users" --mode read-only
 echo ""
 
+# --- EXPLAIN ANALYZE bypass prevention ---
+echo "EXPLAIN ANALYZE bypass prevention:"
+assert_exit "EXPLAIN (no ANALYZE) allowed on read-only" 0 \
+  --query "EXPLAIN SELECT * FROM users" --mode read-only
+assert_exit "EXPLAIN ANALYZE blocked on read-only" 1 \
+  --query "EXPLAIN ANALYZE SELECT * FROM users" --mode read-only
+assert_exit "EXPLAIN ANALYZE DELETE blocked on read-only" 1 \
+  --query "EXPLAIN ANALYZE DELETE FROM users WHERE id = 1" --mode read-only
+assert_exit "EXPLAIN ANALYZE INSERT blocked on read-only" 1 \
+  --query "EXPLAIN ANALYZE INSERT INTO users (name) VALUES ('test')" --mode read-only
+assert_exit "explain analyze lowercase blocked on read-only" 1 \
+  --query "explain analyze select * from users" --mode read-only
+echo ""
+
+# --- SET/RESET bypass prevention ---
+echo "SET/RESET bypass prevention:"
+assert_exit "SET blocked on read-only" 1 \
+  --query "SET default_transaction_read_only = OFF" --mode read-only
+assert_exit "RESET blocked on read-only" 1 \
+  --query "RESET default_transaction_read_only" --mode read-only
+assert_exit "SET statement_timeout blocked on read-only" 1 \
+  --query "SET statement_timeout = '0'" --mode read-only
+assert_exit "SET blocked on read-write" 0 \
+  --query "SET statement_timeout = '0'" --mode read-write
+echo ""
+
+# --- CTE write detection ---
+echo "CTE write detection:"
+assert_exit "CTE with DELETE blocked on read-only" 1 \
+  --query "WITH deleted AS (DELETE FROM users RETURNING *) SELECT * FROM deleted" --mode read-only
+assert_exit "CTE with INSERT blocked on read-only" 1 \
+  --query "WITH ins AS (INSERT INTO users (name) VALUES ('test') RETURNING *) SELECT * FROM ins" --mode read-only
+assert_exit "CTE with UPDATE blocked on read-only" 1 \
+  --query "WITH upd AS (UPDATE users SET name = 'x' RETURNING *) SELECT * FROM upd" --mode read-only
+assert_exit "CTE with SELECT allowed on read-only" 0 \
+  --query "WITH cte AS (SELECT * FROM users) SELECT * FROM cte" --mode read-only
+echo ""
+
 # --- Summary ---
 echo "=== Results: $PASS passed, $FAIL failed ==="
 

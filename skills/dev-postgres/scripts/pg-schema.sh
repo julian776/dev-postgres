@@ -81,6 +81,24 @@ if [[ -z "$ACTION" ]]; then
   usage
 fi
 
+# Sanitize SQL identifiers to prevent injection.
+# Only allows alphanumeric, underscore, and dollar sign (valid PostgreSQL identifier chars).
+# Rejects anything else (quotes, semicolons, spaces, etc.).
+sanitize_identifier() {
+  local value="$1"
+  local label="$2"
+  if [[ ! "$value" =~ ^[a-zA-Z_][a-zA-Z0-9_\$]*$ ]]; then
+    echo "Error: Invalid $label: '$value' (must be a valid SQL identifier — alphanumeric and underscores only)" >&2
+    exit 3
+  fi
+  echo "$value"
+}
+
+SCHEMA=$(sanitize_identifier "$SCHEMA" "schema name")
+if [[ -n "$TABLE" ]]; then
+  TABLE=$(sanitize_identifier "$TABLE" "table name")
+fi
+
 # Run a query through pg-query.sh
 run_query() {
   local sql="$1"

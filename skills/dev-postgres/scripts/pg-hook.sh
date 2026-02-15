@@ -47,17 +47,35 @@ ALLOWED_PATTERNS=(
   'pg-hook\.sh'
 )
 
-# Check if command invokes one of our wrapper scripts
-for pattern in "${ALLOWED_PATTERNS[@]}"; do
+# Check blocked patterns FIRST — always, even if the command also references
+# our wrapper scripts. This prevents chaining bypasses like:
+#   bash pg-query.sh --query 'SELECT 1' && psql -h prod mydb
+IS_BLOCKED=false
+for pattern in "${BLOCKED_PATTERNS[@]}"; do
   if echo "$COMMAND" | grep -qE "$pattern"; then
-    echo '{"decision": "allow"}'
-    exit 0
+    IS_BLOCKED=true
+    break
   fi
 done
 
-# Check if command matches any blocked pattern
-for pattern in "${BLOCKED_PATTERNS[@]}"; do
-  if echo "$COMMAND" | grep -qE "$pattern"; then
+# If the command references a blocked tool, check whether it's ONLY being used
+# through our wrapper scripts. We strip the wrapper script invocations and
+# re-check for blocked patterns in the remainder.
+if [[ "$IS_BLOCKED" == true ]]; then
+  STRIPPED_COMMAND="$COMMAND"
+  for pattern in "${ALLOWED_PATTERNS[@]}"; do
+    # Remove wrapper script invocations (and their arguments up to a command separator)
+    STRIPPED_COMMAND=$(echo "$STRIPPED_COMMAND" | sed -E "s|[^;&|]*${pattern}[^;&|]*||g")
+  done
+  # Re-check: if blocked patterns still appear after stripping allowed invocations, block
+  STILL_BLOCKED=false
+  for pattern in "${BLOCKED_PATTERNS[@]}"; do
+    if echo "$STRIPPED_COMMAND" | grep -qE "$pattern"; then
+      STILL_BLOCKED=true
+      break
+    fi
+  done
+  if [[ "$STILL_BLOCKED" == true ]]; then
     REASON="Direct PostgreSQL CLI access is blocked by dev-postgres security policy. Use the wrapper scripts instead:\\n"
     REASON+="  - pg-query.sh --query 'SELECT ...' [--connection name]\\n"
     REASON+="  - pg-schema.sh --action list-tables [--connection name]\\n"
@@ -65,7 +83,7 @@ for pattern in "${BLOCKED_PATTERNS[@]}"; do
     echo "{\"decision\": \"block\", \"reason\": \"$REASON\"}"
     exit 0
   fi
-done
+fi
 
 # Not a PostgreSQL command — allow
 echo '{"decision": "allow"}'

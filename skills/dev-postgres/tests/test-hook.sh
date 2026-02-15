@@ -55,6 +55,17 @@ assert_decision "Git command" "allow" "git status"
 assert_decision "npm install" "allow" "npm install"
 echo ""
 
+# --- Command chaining bypass prevention ---
+echo "Command chaining bypass prevention:"
+assert_decision "pg-query.sh && psql blocked" "block" "bash skills/dev-postgres/scripts/pg-query.sh --query 'SELECT 1' && psql -h localhost mydb"
+assert_decision "pg-query.sh ; psql blocked" "block" "bash skills/dev-postgres/scripts/pg-query.sh --query 'SELECT 1'; psql -h localhost mydb"
+assert_decision "pg-query.sh | psql blocked" "block" "bash skills/dev-postgres/scripts/pg-query.sh --query 'SELECT 1' | psql -h localhost mydb"
+assert_decision "pg-query.sh || psql blocked" "block" "bash skills/dev-postgres/scripts/pg-query.sh --query 'SELECT 1' || psql -h localhost mydb"
+assert_decision "psql && pg-query.sh blocked" "block" "psql -h localhost mydb && bash skills/dev-postgres/scripts/pg-query.sh --query 'SELECT 1'"
+assert_decision "pg-query.sh alone still allowed" "allow" "bash skills/dev-postgres/scripts/pg-query.sh --query 'SELECT 1'"
+assert_decision "pg-schema.sh alone still allowed" "allow" "bash skills/dev-postgres/scripts/pg-schema.sh --action list-tables"
+echo ""
+
 # --- Edge cases ---
 echo "Edge cases:"
 assert_decision "Empty input allows" "allow" ""
