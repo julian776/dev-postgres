@@ -25,20 +25,26 @@ You have access to PostgreSQL databases through secure wrapper scripts. **Never 
 
 Follow this pattern when exploring a database:
 
-1. **Discover** — Start with schema inspection to understand the structure
+0. **Connect** — List available connections to pick the right one
+1. **Discover** — Inspect schema to understand the structure
 2. **Query** — Write focused queries based on what you learned
 3. **Observe** — Check the results and refine
 4. **Repeat** — Narrow down or expand based on findings
 
+> **Always run `list-connections` first** to understand which databases are available and pick the appropriate connection for the user's request. Don't assume the default connection is the right one.
+
 ```bash
+# 0. Connect: What databases are available?
+bash skills/dev-postgres/scripts/pg-schema.sh --action list-connections
+
 # 1. Discover: What tables exist?
-bash skills/dev-postgres/scripts/pg-schema.sh --action list-tables
+bash skills/dev-postgres/scripts/pg-schema.sh --action list-tables --connection dev
 
 # 2. Discover: What does a table look like?
-bash skills/dev-postgres/scripts/pg-schema.sh --action describe --table users
+bash skills/dev-postgres/scripts/pg-schema.sh --action describe --table users --connection dev
 
 # 3. Query: Get the data you need
-bash skills/dev-postgres/scripts/pg-query.sh --query "SELECT id, name, email FROM users WHERE active = true LIMIT 10"
+bash skills/dev-postgres/scripts/pg-query.sh --query "SELECT id, name, email FROM users WHERE active = true LIMIT 10" --connection dev
 ```
 
 ## Configuration
@@ -80,6 +86,12 @@ bash skills/dev-postgres/scripts/pg-query.sh --query "DROP TABLE temp_data" --co
 Use `pg-schema.sh` for database structure exploration:
 
 ```bash
+# List configured connections (no database access needed)
+bash skills/dev-postgres/scripts/pg-schema.sh --action list-connections
+
+# List connections as JSON
+bash skills/dev-postgres/scripts/pg-schema.sh --action list-connections --format json
+
 # List all tables
 bash skills/dev-postgres/scripts/pg-schema.sh --action list-tables
 

@@ -7,6 +7,7 @@
       "user": "dev_user",
       "password": "${DEV_POSTGRES_PASSWORD}",
       "mode": "read-write",
+      "description": "Local development database — safe to write",
       "sslmode": "prefer",
       "require_confirmation": false
     },
@@ -17,6 +18,7 @@
       "user": "staging_readonly",
       "password": "${STAGING_POSTGRES_PASSWORD}",
       "mode": "read-only",
+      "description": "Staging replica for QA and testing",
       "sslmode": "require"
     },
     "prod": {
@@ -26,13 +28,13 @@
       "user": "readonly_user",
       "password": "${PROD_POSTGRES_PASSWORD}",
       "mode": "read-only",
+      "description": "Production read replica — live customer data",
       "sslmode": "require",
       "schemas": ["public", "analytics"]
     }
   },
   "default_connection": "dev",
   "security": {
-    "block_direct_access": true,
     "require_confirmation_for_destructive": true,
     "log_all_queries": true,
     "max_rows": 1000,

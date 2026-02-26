@@ -16,6 +16,7 @@ usage() {
 Usage: pg-schema.sh --action <action> [--connection <name>] [--table <name>] [--schema <name>] [--format <aligned|csv|json>] [--config <path>]
 
 Actions:
+  list-connections  List configured database connections (no database access needed)
   list-tables       List all tables (optionally in a schema)
   list-views        List all views (optionally in a schema)
   list-schemas      List all schemas
@@ -41,6 +42,7 @@ CONNECTION_ARGS=()
 TABLE=""
 SCHEMA="public"
 FORMAT="aligned"
+CONFIG_PATH=""
 CONFIG_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -66,6 +68,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --config)
+      CONFIG_PATH="$2"
       CONFIG_ARGS=(--config "$2")
       shift 2
       ;;
@@ -99,6 +102,28 @@ if [[ -n "$TABLE" ]]; then
   TABLE=$(sanitize_identifier "$TABLE" "table name")
 fi
 
+# Find config file (walks up directories, same logic as pg-query.sh)
+find_config() {
+  if [[ -n "$CONFIG_PATH" ]]; then
+    if [[ ! -f "$CONFIG_PATH" ]]; then
+      echo "Error: Config file not found: $CONFIG_PATH" >&2
+      exit 3
+    fi
+    echo "$CONFIG_PATH"
+    return
+  fi
+  local dir="$PWD"
+  while [[ "$dir" != "/" ]]; do
+    if [[ -f "$dir/.dev-postgres.json" ]]; then
+      echo "$dir/.dev-postgres.json"
+      return
+    fi
+    dir="$(dirname "$dir")"
+  done
+  echo "Error: No .dev-postgres.json found. Create one in your project root." >&2
+  exit 3
+}
+
 # Run a query through pg-query.sh
 run_query() {
   local sql="$1"
@@ -110,6 +135,55 @@ run_query() {
 }
 
 case "$ACTION" in
+  list-connections)
+    CONFIG_RESOLVED=$(find_config)
+    DEFAULT_CONN=$(jq -r '.default_connection // ""' "$CONFIG_RESOLVED")
+    case "$FORMAT" in
+      json)
+        jq --arg dc "$DEFAULT_CONN" \
+          '[.connections | to_entries | sort_by(.key)[] | {
+            name: .key,
+            description: (.value.description // ""),
+            mode: (.value.mode // "read-only"),
+            database: .value.database,
+            host: (.value.host // "localhost"),
+            default: (.key == $dc)
+          }]' "$CONFIG_RESOLVED"
+        ;;
+      csv)
+        echo "name,description,mode,database,host,default"
+        jq -r --arg dc "$DEFAULT_CONN" \
+          '.connections | to_entries | sort_by(.key)[] | [
+            .key,
+            (.value.description // ""),
+            (.value.mode // "read-only"),
+            .value.database,
+            (.value.host // "localhost"),
+            (if .key == $dc then "true" else "false" end)
+          ] | @csv' "$CONFIG_RESOLVED"
+        ;;
+      aligned)
+        {
+          printf '%s\t%s\t%s\t%s\t%s\t%s\n' "name" "description" "mode" "database" "host" "default"
+          printf '%s\t%s\t%s\t%s\t%s\t%s\n' "----" "-----------" "----" "--------" "----" "-------"
+          jq -r --arg dc "$DEFAULT_CONN" \
+            '.connections | to_entries | sort_by(.key)[] | [
+              .key,
+              (.value.description // ""),
+              (.value.mode // "read-only"),
+              .value.database,
+              (.value.host // "localhost"),
+              (if .key == $dc then "*" else "" end)
+            ] | @tsv' "$CONFIG_RESOLVED"
+        } | column -s $'\t' -t
+        ;;
+      *)
+        echo "Error: Unknown format: $FORMAT (use aligned, csv, json)" >&2
+        exit 3
+        ;;
+    esac
+    ;;
+
   list-tables)
     run_query "
       SELECT table_schema, table_name, table_type
@@ -232,7 +306,7 @@ case "$ACTION" in
 
   *)
     echo "Error: Unknown action: $ACTION" >&2
-    echo "Valid actions: list-tables, list-views, list-schemas, describe, indexes, foreign-keys, table-sizes, connection-info" >&2
+    echo "Valid actions: list-connections, list-tables, list-views, list-schemas, describe, indexes, foreign-keys, table-sizes, connection-info" >&2
     exit 3
     ;;
 esac

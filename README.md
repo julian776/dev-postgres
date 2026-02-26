@@ -61,7 +61,8 @@ Replace the example values with your actual database credentials:
       "database": "your_database_name",
       "user": "your_username",
       "password": "${DEV_POSTGRES_PASSWORD}",
-      "mode": "read-write"
+      "mode": "read-write",
+      "description": "Local development database"
     }
   },
   "default_connection": "dev",
@@ -163,7 +164,8 @@ You can configure multiple database connections:
       "database": "myapp_dev",
       "user": "dev_user",
       "password": "${DEV_POSTGRES_PASSWORD}",
-      "mode": "read-write"
+      "mode": "read-write",
+      "description": "Local development database — safe to write"
     },
     "staging": {
       "host": "staging-db.example.com",
@@ -171,7 +173,8 @@ You can configure multiple database connections:
       "database": "myapp_staging",
       "user": "readonly_user",
       "password": "${STAGING_POSTGRES_PASSWORD}",
-      "mode": "read-only"
+      "mode": "read-only",
+      "description": "Staging replica for QA and testing"
     },
     "prod": {
       "host": "prod-replica.example.com",
@@ -179,7 +182,8 @@ You can configure multiple database connections:
       "database": "myapp_prod",
       "user": "readonly_user",
       "password": "${PROD_POSTGRES_PASSWORD}",
-      "mode": "read-only"
+      "mode": "read-only",
+      "description": "Production read replica — live customer data"
     }
   },
   "default_connection": "dev"
