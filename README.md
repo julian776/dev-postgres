@@ -153,7 +153,7 @@ bash skills/dev-postgres/scripts/pg-query.sh --query "SELECT count(*) FROM order
 
 ## Multiple Connections (Dev, Staging, Prod)
 
-You can configure multiple database connections:
+You can configure multiple database connections. Use the `description` field to explain to the agent what each connection is for — the agent reads these descriptions when listing connections and uses them to pick the right database for your request:
 
 ```json
 {
