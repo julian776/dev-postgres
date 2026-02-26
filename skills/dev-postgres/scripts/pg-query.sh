@@ -183,11 +183,22 @@ fi
 
 # --- Security settings ---
 SECURITY_JSON=$(jq -r '.security // {}' "$CONFIG_FILE")
-BLOCK_DIRECT=$(echo "$SECURITY_JSON" | jq -r '.block_direct_access // true')
 REQUIRE_CONFIRM_GLOBAL=$(echo "$SECURITY_JSON" | jq -r '.require_confirmation_for_destructive // true')
 LOG_QUERIES=$(echo "$SECURITY_JSON" | jq -r '.log_all_queries // true')
 MAX_ROWS=$(echo "$SECURITY_JSON" | jq -r '.max_rows // 1000')
 QUERY_TIMEOUT=$(echo "$SECURITY_JSON" | jq -r '.query_timeout_seconds // 30')
+
+# Validate max_rows is a positive integer (prevents SQL injection via config)
+if ! [[ "$MAX_ROWS" =~ ^[0-9]+$ ]] || [[ "$MAX_ROWS" -eq 0 ]]; then
+  echo "Error: Invalid max_rows in config: '$MAX_ROWS' (must be a positive integer)" >&2
+  exit 3
+fi
+
+# Validate query_timeout_seconds is a positive integer
+if ! [[ "$QUERY_TIMEOUT" =~ ^[0-9]+$ ]] || [[ "$QUERY_TIMEOUT" -eq 0 ]]; then
+  echo "Error: Invalid query_timeout_seconds in config: '$QUERY_TIMEOUT' (must be a positive integer)" >&2
+  exit 3
+fi
 
 # Per-connection require_confirmation overrides the global setting
 REQUIRE_CONFIRM_CONN=$(echo "$CONN_JSON" | jq -r '.require_confirmation // empty')
@@ -230,12 +241,18 @@ inject_limit() {
   # Normalize for detection (uppercase, collapse whitespace)
   local upper
   upper=$(echo "$sql" | tr '[:lower:]' '[:upper:]' | tr '\n' ' ' | sed 's/  */ /g')
+  # Strip SQL comments before checking for existing LIMIT to prevent bypass
+  # via "SELECT * FROM users -- LIMIT 100" or "SELECT * FROM users /* LIMIT 100 */"
+  local stripped
+  stripped=$(echo "$upper" | sed 's/--.*$//')
+  stripped=$(echo "$stripped" | perl -pe 's|/\*.*?\*/||gs' 2>/dev/null || echo "$stripped" | sed 's|/\*[^*]*\*/||g')
+  stripped=$(echo "$stripped" | sed 's/  */ /g' | sed 's/^ *//;s/ *$//')
   # Only apply to simple SELECT statements without existing LIMIT
-  if echo "$upper" | grep -qE '^[[:space:]]*SELECT[[:space:]]' && \
-     ! echo "$upper" | grep -qE 'LIMIT[[:space:]]+[0-9]' && \
-     ! echo "$upper" | grep -qE ';.*SELECT'; then
-    # Strip trailing semicolons and whitespace, add LIMIT
-    sql=$(echo "$sql" | sed 's/[[:space:]]*;[[:space:]]*$//')
+  if echo "$stripped" | grep -qE '^[[:space:]]*SELECT[[:space:]]' && \
+     ! echo "$stripped" | grep -qE 'LIMIT[[:space:]]+[0-9]' && \
+     ! echo "$stripped" | grep -qE ';.*SELECT'; then
+    # Strip trailing semicolons, comments, and whitespace, add LIMIT
+    sql=$(echo "$sql" | sed 's/[[:space:]]*--.*$//' | sed 's/[[:space:]]*;[[:space:]]*$//')
     echo "$sql LIMIT $max;"
   else
     echo "$sql"
@@ -304,17 +321,10 @@ case "$FORMAT" in
 esac
 
 # --- Execute ---
-export PGPASSWORD="$DB_PASSWORD"
-export PGSSLMODE="$DB_SSLMODE"
-
-cleanup() {
-  unset PGPASSWORD
-  unset PGSSLMODE
-}
-trap cleanup EXIT
+# Scope PGPASSWORD to psql invocations only (not exported to child processes like python3)
 
 if [[ "$FORMAT" == "json" ]]; then
-  CSV_OUTPUT=$(psql "${PSQL_ARGS[@]}" 2>&1) || {
+  CSV_OUTPUT=$(PGPASSWORD="$DB_PASSWORD" PGSSLMODE="$DB_SSLMODE" psql "${PSQL_ARGS[@]}" 2>&1) || {
     EXIT_CODE=$?
     echo "Error executing query:" >&2
     echo "$CSV_OUTPUT" >&2
@@ -334,7 +344,7 @@ print()
     echo "$CSV_OUTPUT"
   fi
 else
-  psql "${PSQL_ARGS[@]}" 2>&1 || {
+  PGPASSWORD="$DB_PASSWORD" PGSSLMODE="$DB_SSLMODE" psql "${PSQL_ARGS[@]}" 2>&1 || {
     EXIT_CODE=$?
     echo "Error executing query (exit code: $EXIT_CODE)" >&2
     exit 4

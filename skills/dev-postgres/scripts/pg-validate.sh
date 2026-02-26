@@ -134,6 +134,11 @@ DESTRUCTIVE_PATTERNS=(
 
 is_destructive() {
   local sql="$1"
+  # DO blocks can execute arbitrary dynamic SQL — always flag as destructive
+  # since we cannot inspect what the EXECUTE statements will actually run.
+  if echo "$sql" | grep -qE '^[[:space:]]*DO[[:space:]]'; then
+    return 0
+  fi
   for pattern in "${DESTRUCTIVE_PATTERNS[@]}"; do
     if echo "$sql" | grep -qE "$pattern"; then
       # For DELETE, check if there's a WHERE clause

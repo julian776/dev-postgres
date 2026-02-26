@@ -20,9 +20,17 @@ The hook intercepts all Bash tool calls before execution and blocks direct acces
 - `createdb` / `dropdb` — Database management
 - `createuser` / `dropuser` — Role management
 - `pg_basebackup` — Physical backup tool
+- `vacuumdb` / `reindexdb` / `clusterdb` — Maintenance tools
+- `pg_recvlogical` — Replication stream consumer
+- `pg_amcheck` — Corruption checker
 - `postgresql://` / `postgres://` — Connection URI patterns
 
-**Allowed through:** Commands that invoke the wrapper scripts (`pg-query.sh`, `pg-schema.sh`, `pg-validate.sh`).
+**Evasion detection:** The hook also blocks commands that use encoding or obfuscation techniques to hide PostgreSQL tool names:
+- `base64` encoding (e.g., `echo cHNxbA== | base64 -d | bash`)
+- `eval` with string concatenation (e.g., `eval "ps""ql ..."`)
+- `printf` hex encoding (e.g., `$(printf "\x70\x73\x71\x6c")`)
+
+**Allowed through:** Commands that invoke the wrapper scripts (`pg-query.sh`, `pg-schema.sh`, `pg-validate.sh`) with no blocked tools embedded in their arguments.
 
 **Limitation:** The hook only intercepts `Bash` tool calls. Other tools (MCP servers, etc.) are not covered. See limitations.md.
 
@@ -61,7 +69,14 @@ This prevents runaway queries from consuming database resources. Default: 30 sec
 
 ## Layer 5: Destructive Operation Confirmation
 
-When `require_confirmation_for_destructive` is enabled (default), operations like DROP TABLE, TRUNCATE, and DELETE without WHERE require an explicit `--confirm` flag. This provides a human-in-the-loop checkpoint for irreversible operations.
+When `require_confirmation_for_destructive` is enabled (default), the following operations require an explicit `--confirm` flag:
+
+- `DROP TABLE`, `DROP DATABASE`, `DROP SCHEMA`, etc.
+- `TRUNCATE`
+- `DELETE FROM <table>` without a `WHERE` clause
+- All `DO` blocks (since they can execute arbitrary dynamic SQL via `EXECUTE` that cannot be statically inspected)
+
+This provides a human-in-the-loop checkpoint for irreversible operations.
 
 **Per-connection override:** Each connection can set `"require_confirmation": false` to disable confirmation for that connection only, overriding the global setting. This is useful for local dev databases where confirmation adds friction:
 
@@ -82,10 +97,18 @@ The precedence is: connection-level `require_confirmation` > global `require_con
 
 - Passwords in `.dev-postgres.json` use `${ENV_VAR}` syntax and are resolved at runtime
 - Never store plaintext passwords in the config file
-- The `PGPASSWORD` environment variable is used to pass credentials to `psql` and is unset immediately after execution
+- `PGPASSWORD` is scoped to psql invocations only (via inline env prefix, not `export`), so child processes like python3 (used for JSON output) do not inherit it
 - For higher security, use a `.pgpass` file or `PGPASSFILE` environment variable instead
 
 **Important:** `PGPASSWORD` may briefly appear in `/proc` or `ps` output. In high-security environments, prefer `.pgpass`.
+
+## Config Value Validation
+
+Security-critical config values are validated before use:
+
+- `max_rows` — Must be a positive integer. Prevents SQL injection via `LIMIT` clause (e.g., a malicious `"max_rows": "1; DROP TABLE users; --"` is rejected).
+- `query_timeout_seconds` — Must be a positive integer. Prevents injection via `SET statement_timeout`.
+- Schema names — Validated against a strict SQL identifier regex (`^[a-zA-Z_][a-zA-Z0-9_$]*$`).
 
 ## Query Logging
 

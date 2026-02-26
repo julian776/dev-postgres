@@ -20,7 +20,9 @@ skills/dev-postgres/
 │   ├── config-example.json  # Example .dev-postgres.json
 │   └── setup-roles.sql     # PostgreSQL role setup SQL
 └── tests/
-    └── test-validate.sh  # Validation script tests
+    ├── test-validate.sh  # Validation script tests
+    ├── test-hook.sh      # Hook script tests
+    └── test-security.sh  # Security vulnerability regression tests
 ```
 
 ## Architecture
@@ -51,8 +53,10 @@ User request → SKILL.md instructions → pg-query.sh → pg-validate.sh → ps
 ## Testing
 
 ```bash
-# Run validation tests
+# Run all unit tests
 bash skills/dev-postgres/tests/test-validate.sh
+bash skills/dev-postgres/tests/test-hook.sh
+bash skills/dev-postgres/tests/test-security.sh
 ```
 
 ## Pre-Completion Checklist
@@ -61,6 +65,8 @@ Before finishing any task:
 
 1. Run `bash -n skills/dev-postgres/scripts/*.sh` to syntax-check all scripts
 2. Run `bash skills/dev-postgres/tests/test-validate.sh` to verify validation logic
-3. Ensure all scripts have `set -euo pipefail` at the top
-4. Ensure all scripts use `#!/usr/bin/env bash` shebang
-5. Verify BSD compatibility (macOS) — avoid GNU-only sed/grep flags
+3. Run `bash skills/dev-postgres/tests/test-hook.sh` to verify hook logic
+4. Run `bash skills/dev-postgres/tests/test-security.sh` to verify security regression tests
+5. Ensure all scripts have `set -euo pipefail` at the top
+6. Ensure all scripts use `#!/usr/bin/env bash` shebang
+7. Verify BSD compatibility (macOS) — avoid GNU-only sed/grep flags

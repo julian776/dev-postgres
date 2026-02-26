@@ -200,11 +200,17 @@ export PROD_POSTGRES_PASSWORD="prod_password"
 
 Every query passes through 5 independent security layers:
 
-1. **Hook** — Blocks direct CLI access to `psql`, `pg_dump`, etc.
-2. **Validation** — Regex-based read/write classification
-3. **PostgreSQL Session** — `SET default_transaction_read_only = ON` for read-only connections
-4. **Timeout** — `SET statement_timeout` prevents runaway queries
-5. **Confirmation** — Destructive operations (DROP, TRUNCATE) require explicit `--confirm`
+1. **Hook** — Blocks direct CLI access to `psql`, `pg_dump`, `vacuumdb`, and 14 other PostgreSQL tools. Also detects evasion techniques (base64 encoding, eval, printf hex).
+2. **Validation** — Regex-based read/write classification. Detects writes in multi-statement queries, CTEs, EXPLAIN ANALYZE, SET/RESET, and DO blocks.
+3. **PostgreSQL Session** — `SET default_transaction_read_only = ON` for read-only connections (server-enforced, cannot be bypassed by query construction).
+4. **Timeout** — `SET statement_timeout` prevents runaway queries.
+5. **Confirmation** — Destructive operations (DROP, TRUNCATE, DELETE without WHERE, all DO blocks) require explicit `--confirm`.
+
+Additional protections:
+
+- **Config validation** — `max_rows` and `query_timeout_seconds` are validated as positive integers to prevent SQL injection via config.
+- **Password scoping** — `PGPASSWORD` is scoped to psql invocations only, not exported to child processes.
+- **Schema name validation** — Schema and table names in pg-schema.sh are validated against a strict identifier allowlist.
 
 > **Important:** For production databases, use a **read replica** (physically cannot write) or a **read-only PostgreSQL user**. See [templates/setup-roles.sql](skills/dev-postgres/templates/setup-roles.sql) for role setup.
 
@@ -235,6 +241,29 @@ Every query passes through 5 independent security layers:
 - **Output Formats** — Aligned (tabular), CSV, and JSON
 - **Query Logging** — Full audit trail of all executed queries
 - **Auto-LIMIT** — Unbounded SELECTs get configurable row limit
+
+---
+
+## Changelog
+
+### 2026-02-26 — Security Hardening
+
+Security review identified and fixed 9 vulnerabilities across the hook, query executor, and validator scripts. All fixes are covered by 22 new regression tests in `test-security.sh`.
+
+**Hook (pg-hook.sh):**
+- Fixed bypass via command substitution (`$(psql ...)` embedded in wrapper script arguments)
+- Fixed bypass via encoding/obfuscation (base64, eval string concatenation, printf hex)
+- Added 5 missing PostgreSQL CLI tools to blocklist: `vacuumdb`, `reindexdb`, `clusterdb`, `pg_recvlogical`, `pg_amcheck`
+- Removed dead `block_direct_access` config option (was read but never enforced)
+
+**Query executor (pg-query.sh):**
+- Fixed auto-LIMIT bypass via SQL comments (`-- LIMIT 100` and `/* LIMIT 100 */` no longer fool the LIMIT detection)
+- Fixed SQL injection via `max_rows` config value (now validated as positive integer)
+- Added validation for `query_timeout_seconds` (must be positive integer)
+- Scoped `PGPASSWORD` to psql invocations only (no longer exported to child processes like python3)
+
+**Validator (pg-validate.sh):**
+- All `DO` blocks now flagged as destructive and require `--confirm`, since dynamic SQL inside `EXECUTE` cannot be statically inspected for destructive operations
 
 ---
 
