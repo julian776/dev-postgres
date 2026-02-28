@@ -200,6 +200,85 @@ export PROD_POSTGRES_PASSWORD="prod_password"
 
 ---
 
+## Securing Your Connections
+
+The skill enforces read-only mode at the session level, but the strongest protection comes from the database itself. If the PostgreSQL user only has `SELECT` privileges, no client — including this skill — can perform writes, regardless of configuration mistakes or software bugs.
+
+### Step 1: Create a Read-Only Role in PostgreSQL
+
+Connect to your database as a superuser and create a role with only read permissions:
+
+```sql
+-- Create the role
+CREATE ROLE readonly_user WITH LOGIN PASSWORD 'CHANGE_ME';
+
+-- Allow connecting to the database
+GRANT CONNECT ON DATABASE myapp TO readonly_user;
+
+-- Grant read access to the schemas you need
+GRANT USAGE ON SCHEMA public TO readonly_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user;
+
+-- Auto-grant SELECT on any tables created in the future
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT ON TABLES TO readonly_user;
+
+-- Optional: enforce a query timeout at the role level
+ALTER ROLE readonly_user SET statement_timeout = '30s';
+```
+
+> A complete example with multiple schemas is available in [templates/setup-roles.sql](templates/setup-roles.sql).
+
+### Step 2: Use the Read-Only Role in Your Connection Config
+
+Point your read-only connections at this new role and set `mode` to `read-only`:
+
+```json
+{
+  "connections": {
+    "dev": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "myapp_dev",
+      "user": "dev_user",
+      "password": "${DEV_POSTGRES_PASSWORD}",
+      "mode": "read-write",
+      "description": "Local development database — safe to write"
+    },
+    "prod": {
+      "host": "prod-db.example.com",
+      "port": 5432,
+      "database": "myapp_prod",
+      "user": "readonly_user",
+      "password": "${PROD_READONLY_PASSWORD}",
+      "mode": "read-only",
+      "sslmode": "require",
+      "description": "Production — read-only role, cannot write"
+    }
+  },
+  "default_connection": "dev"
+}
+```
+
+This gives you two independent layers of write protection on the `prod` connection:
+
+1. **Database-level** — the `readonly_user` role only has `SELECT` privileges, so PostgreSQL itself rejects any write attempt.
+2. **Skill-level** — `"mode": "read-only"` enables session-level `SET default_transaction_read_only = ON` and regex-based write blocking.
+
+Even if one layer fails, the other still prevents writes.
+
+### Why This Matters
+
+| Protection layer | Blocks writes? | Can be bypassed by config mistake? |
+|---|---|---|
+| `mode: "read-only"` in config | Yes (session + regex) | Yes — if someone changes it to `read-write` |
+| Read-only PostgreSQL role | Yes (server-enforced) | No — only a superuser can grant write privileges |
+| Read replica | Yes (physically impossible) | No — replicas cannot accept writes |
+
+**Recommended approach:** use a read-only PostgreSQL role for staging and production connections. If available, connect to a read replica for the strongest guarantee.
+
+---
+
 ## Security
 
 Every query passes through 5 independent security layers:
@@ -216,7 +295,7 @@ Additional protections:
 - **Password scoping** — `PGPASSWORD` is scoped to psql invocations only, not exported to child processes.
 - **Schema name validation** — Schema and table names in pg-schema.sh are validated against a strict identifier allowlist.
 
-> **Important:** For production databases, use a **read replica** (physically cannot write) or a **read-only PostgreSQL user**. See [templates/setup-roles.sql](skills/dev-postgres/templates/setup-roles.sql) for role setup.
+> **Important:** For production databases, use a **read replica** (physically cannot write) or a **read-only PostgreSQL user**. See [templates/setup-roles.sql](templates/setup-roles.sql) for role setup.
 
 ---
 
@@ -276,7 +355,7 @@ Security review identified and fixed 9 vulnerabilities across the hook, query ex
 - [Security Architecture](skills/dev-postgres/references/security.md)
 - [Query Examples](skills/dev-postgres/references/query-examples.md)
 - [Known Limitations](skills/dev-postgres/references/limitations.md)
-- [PostgreSQL Role Setup](skills/dev-postgres/templates/setup-roles.sql)
+- [PostgreSQL Role Setup](templates/setup-roles.sql) — SQL templates for creating read-only and read-write roles
 
 ## License
 

@@ -65,7 +65,7 @@ The skill scripts check for required dependencies at runtime and provide specifi
    The skill's read-only mode is defense-in-depth — the real guarantee must come from the database:
 
    - **Preferred: Connect to a read replica.** Read replicas are physically incapable of accepting writes. This is the strongest guarantee available.
-   - **Alternative: Use a read-only database user.** Create a PostgreSQL role with only `SELECT` privileges. See `templates/setup-roles.sql` for a ready-to-use template.
+   - **Alternative: Use a read-only database user.** Configure a PostgreSQL role with only `SELECT` privileges. See the "Securing Your Connections" section in the README for step-by-step instructions.
 
    Either approach ensures that no software bug, misconfiguration, or bypassed layer can result in accidental writes to production.
 

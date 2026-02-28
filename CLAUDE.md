@@ -17,8 +17,7 @@ skills/dev-postgres/
 │   ├── query-examples.md # Common query patterns
 │   └── installation.md   # Setup instructions
 ├── templates/
-│   ├── config-example.json  # Example .dev-postgres.json
-│   └── setup-roles.sql     # PostgreSQL role setup SQL
+│   └── config-example.json  # Example .dev-postgres.json
 └── tests/
     ├── test-validate.sh  # Validation script tests
     ├── test-hook.sh      # Hook script tests
