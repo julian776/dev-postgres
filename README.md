@@ -1,6 +1,6 @@
 # dev-postgres: Secure PostgreSQL Access for Claude Code
 
-## ⚠️ BETA - TESTING IN PROGRESS
+## TESTING IN PROGRESS
 Do not use in production environments. Currently under active testing.
 
 **dev-postgres** is a Claude Code skill that provides secure, auditable PostgreSQL database access with defense-in-depth security.
