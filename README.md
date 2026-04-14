@@ -1,8 +1,5 @@
 # dev-postgres: Secure PostgreSQL Access for Claude Code
 
-## TESTING IN PROGRESS
-Do not use in production environments. Currently under active testing.
-
 **dev-postgres** is a Claude Code skill that provides secure, auditable PostgreSQL database access with defense-in-depth security.
 
 ## Installation
@@ -28,16 +25,32 @@ sudo apt-get install -y postgresql-client jq
 sudo dnf install -y postgresql jq
 ```
 
-### Step 2: Install the Plugin
+### Step 2: Install the Skill
 
-Run these commands inside Claude Code:
+**Option A — One-command install (recommended):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/julian776/dev-postgres/main/install.sh | bash
+```
+
+This clones the repo, checks dependencies, creates a config template, sets permissions, and runs a self-test. Follow the printed "Next steps" to register the plugin in Claude Code.
+
+**Option B — Manual clone + install:**
+
+```bash
+git clone https://github.com/julian776/dev-postgres.git
+cd dev-postgres
+bash install.sh
+```
+
+**Option C — Register directly in Claude Code:**
 
 ```
 /plugin marketplace add julian776/dev-postgres
 /plugin install dev-postgres@julian776/dev-postgres
 ```
 
-**Restart Claude Code after installation.**
+After installation, **restart Claude Code** so the skill and hook are loaded.
 
 ---
 
@@ -50,7 +63,7 @@ Edit the config file created by the installer:
 nano .dev-postgres.json
 ```
 
-Replace the example values with your actual database credentials:
+**Minimum viable config** (one local database):
 
 ```json
 {
@@ -61,28 +74,33 @@ Replace the example values with your actual database credentials:
       "database": "your_database_name",
       "user": "your_username",
       "password": "${DEV_POSTGRES_PASSWORD}",
-      "mode": "read-write",
-      "description": "Local development database"
+      "mode": "read-write"
     }
   },
-  "default_connection": "dev",
-  "security": {
-    "max_rows": 1000,
-    "query_timeout_seconds": 30
-  }
+  "default_connection": "dev"
 }
 ```
 
-**Configuration Fields:**
+**All configuration fields:**
 
-| Field | Description | Example |
-|-------|-------------|---------|
-| `host` | Database hostname | `localhost`, `db.example.com` |
-| `port` | Database port | `5432` |
-| `database` | Database name | `myapp_dev` |
-| `user` | PostgreSQL username | `dev_user` |
-| `password` | Use `${ENV_VAR}` syntax | `${DEV_POSTGRES_PASSWORD}` |
-| `mode` | `read-only` or `read-write` | `read-write` |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| **Connection fields** | | | |
+| `host` | No | `localhost` | Database hostname |
+| `port` | No | `5432` | Database port |
+| `database` | **Yes** | — | Database name |
+| `user` | No | — | PostgreSQL username |
+| `password` | No | — | Use `${ENV_VAR}` syntax for env var interpolation |
+| `mode` | No | `read-only` | `read-only` or `read-write` |
+| `description` | No | — | Human-readable label — the agent reads this to pick the right connection |
+| `sslmode` | No | `prefer` | PostgreSQL SSL mode (`disable`, `prefer`, `require`, `verify-ca`, `verify-full`) |
+| `schemas` | No | — | Array of schema names for `search_path` (e.g., `["public", "analytics"]`) |
+| `require_confirmation` | No | — | Override global destructive confirmation for this connection (`true`/`false`) |
+| **Security fields** (under `"security": {}`) | | | |
+| `require_confirmation_for_destructive` | No | `true` | Require `--confirm` for DROP/TRUNCATE/DELETE-without-WHERE |
+| `log_all_queries` | No | `true` | Log all queries to `.dev-postgres-query.log` |
+| `max_rows` | No | `1000` | Auto-LIMIT for unbounded SELECTs |
+| `query_timeout_seconds` | No | `30` | Per-query timeout |
 
 ---
 
@@ -104,19 +122,19 @@ source ~/.zshrc
 ### Step 5: Test the Connection
 
 ```bash
-# Verify connection works
+# Self-test: verify scripts are loadable (no database needed)
+bash skills/dev-postgres/tests/test-validate.sh
+
+# Test database connectivity
 bash skills/dev-postgres/scripts/pg-schema.sh --action connection-info
 ```
 
-**Expected output:**
+**Expected output** for `connection-info` (a SQL query result):
 
 ```
-Connection: dev
-Host: localhost:5432
-Database: your_database_name
-User: your_username
-Mode: read-write
-Status: connected
+ database  | user      | server_addr | server_port | pg_version
+-----------+-----------+-------------+-------------+-----------
+ myapp_dev | dev_user  | 127.0.0.1   | 5432        | PostgreSQL 16.x ...
 ```
 
 ---
@@ -135,10 +153,33 @@ Once installed, ask Claude to interact with your database naturally:
 ```bash
 # List all tables
 bash skills/dev-postgres/scripts/pg-schema.sh --action list-tables
+```
 
-# Describe a table structure
+Sample output:
+```
+ table_schema | table_name | table_type
+--------------+------------+------------
+ public       | orders     | BASE TABLE
+ public       | products   | BASE TABLE
+ public       | users      | BASE TABLE
+```
+
+```bash
+# Describe a table structure (includes primary key info)
 bash skills/dev-postgres/scripts/pg-schema.sh --action describe --table users
+```
 
+Sample output:
+```
+ column_name |  data_type | character_maximum_length | is_nullable | column_default              | is_primary_key
+-------------+------------+-------------------------+-------------+-----------------------------+---------------
+ id          | integer    |                         | NO          | nextval('users_id_seq'...) | YES
+ name        | text       |                         | NO          |                             | NO
+ email       | text       |                         | YES         |                             | NO
+ active      | boolean    |                         | NO          | true                        | NO
+```
+
+```bash
 # Run a query
 bash skills/dev-postgres/scripts/pg-query.sh --query "SELECT * FROM users LIMIT 10"
 
@@ -296,6 +337,12 @@ Additional protections:
 - **Schema name validation** — Schema and table names in pg-schema.sh are validated against a strict identifier allowlist.
 
 > **Important:** For production databases, use a **read replica** (physically cannot write) or a **read-only PostgreSQL user**. See [templates/setup-roles.sql](templates/setup-roles.sql) for role setup.
+
+### ⚠️ A Note on AI and Write Credentials
+
+This skill enforces read-only mode through hooks, regex validation, and session-level settings — but it runs inside an AI agent. A sufficiently determined model can attempt to bypass skill-level protections (crafting queries that evade validation, invoking unexpected tools, or misinterpreting `read-only` config).
+
+**Recommendation:** do not put write-capable credentials in your `.dev-postgres.json` unless you actually need writes from the agent. For staging and production, point the config at a PostgreSQL role that only has `SELECT` privileges (or a read replica) — see [Securing Your Connections](#securing-your-connections). That way the database itself, not the skill, is the thing blocking writes, and no agent behavior can bypass it.
 
 ---
 
