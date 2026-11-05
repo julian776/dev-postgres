@@ -138,6 +138,10 @@ case "$ACTION" in
   list-connections)
     CONFIG_RESOLVED=$(find_config)
     DEFAULT_CONN=$(jq -r '.default_connection // ""' "$CONFIG_RESOLVED")
+    while IFS= read -r name; do
+      [[ -z "$name" ]] && continue
+      printf "Warning: Connection '%s' uses a legacy password configuration. Migrate to macOS Keychain; see the credential migration instructions.\n" "$name" >&2
+    done < <(jq -r '.connections | to_entries[] | select((.value.password // "") != "") | .key' "$CONFIG_RESOLVED")
     case "$FORMAT" in
       json)
         jq --arg dc "$DEFAULT_CONN" \

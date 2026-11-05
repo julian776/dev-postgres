@@ -73,7 +73,7 @@ nano .dev-postgres.json
       "port": 5432,
       "database": "your_database_name",
       "user": "your_username",
-      "password": "${DEV_POSTGRES_PASSWORD}",
+      "password_keychain": "dev-postgres-dev",
       "mode": "read-write"
     }
   },
@@ -90,7 +90,8 @@ nano .dev-postgres.json
 | `port` | No | `5432` | Database port |
 | `database` | **Yes** | — | Database name |
 | `user` | No | — | PostgreSQL username |
-| `password` | No | — | Use `${ENV_VAR}` syntax for env var interpolation |
+| `password_keychain` | No | — | macOS Keychain generic-password service; account is the connection `user` |
+| `password` | No | — | Legacy literal or `${ENV_VAR}` password; migrate to Keychain |
 | `mode` | No | `read-only` | `read-only` or `read-write` |
 | `description` | No | — | Human-readable label — the agent reads this to pick the right connection |
 | `sslmode` | No | `prefer` | PostgreSQL SSL mode (`disable`, `prefer`, `require`, `verify-ca`, `verify-full`) |
@@ -106,16 +107,17 @@ nano .dev-postgres.json
 
 ### Step 4: Set Your Password
 
-Set the password as an environment variable (never hardcode it in the config):
+On macOS, run this command **yourself in a terminal** and enter the password at its prompt. Use the same service and database user as your connection config:
 
 ```bash
-# Set for current session
-export DEV_POSTGRES_PASSWORD="your_actual_password"
-
-# Or add to your shell profile for persistence
-echo 'export DEV_POSTGRES_PASSWORD="your_actual_password"' >> ~/.zshrc
-source ~/.zshrc
+security add-generic-password -s dev-postgres-dev -a your_username -w
 ```
+
+Do not include the password in the command or grant access to all applications (`-A`). macOS may ask you to authorize access when a query runs.
+
+For existing installations, add the Keychain item first, then replace the connection's `password` field with `"password_keychain": "dev-postgres-dev"`. Existing literal and `${ENV_VAR}` passwords continue to work, but produce a migration warning. Use only one field. On other platforms, existing password configuration remains supported. Connections without either field can continue using PostgreSQL's normal authentication mechanisms.
+
+Keychain reduces accidental exposure in project files; it does not prevent a same-user agent with sufficient Keychain access from retrieving a secret. Query execution still temporarily supplies the password to `psql`.
 
 ---
 
@@ -204,7 +206,7 @@ You can configure multiple database connections. Use the `description` field to 
       "port": 5432,
       "database": "myapp_dev",
       "user": "dev_user",
-      "password": "${DEV_POSTGRES_PASSWORD}",
+      "password_keychain": "dev-postgres-dev",
       "mode": "read-write",
       "description": "Local development database — safe to write"
     },
@@ -213,7 +215,7 @@ You can configure multiple database connections. Use the `description` field to 
       "port": 5432,
       "database": "myapp_staging",
       "user": "readonly_user",
-      "password": "${STAGING_POSTGRES_PASSWORD}",
+      "password_keychain": "dev-postgres-staging",
       "mode": "read-only",
       "description": "Staging replica for QA and testing"
     },
@@ -222,7 +224,7 @@ You can configure multiple database connections. Use the `description` field to 
       "port": 5432,
       "database": "myapp_prod",
       "user": "readonly_user",
-      "password": "${PROD_POSTGRES_PASSWORD}",
+      "password_keychain": "dev-postgres-prod",
       "mode": "read-only",
       "description": "Production read replica — live customer data"
     }
@@ -231,13 +233,7 @@ You can configure multiple database connections. Use the `description` field to 
 }
 ```
 
-Then set all password environment variables:
-
-```bash
-export DEV_POSTGRES_PASSWORD="dev_password"
-export STAGING_POSTGRES_PASSWORD="staging_password"
-export PROD_POSTGRES_PASSWORD="prod_password"
-```
+Create each Keychain item yourself as described above, using each service and user from the configuration. If multiple connections share a service and user, they share the same item.
 
 ---
 
@@ -282,7 +278,7 @@ Point your read-only connections at this new role and set `mode` to `read-only`:
       "port": 5432,
       "database": "myapp_dev",
       "user": "dev_user",
-      "password": "${DEV_POSTGRES_PASSWORD}",
+      "password_keychain": "dev-postgres-dev",
       "mode": "read-write",
       "description": "Local development database — safe to write"
     },
@@ -291,7 +287,7 @@ Point your read-only connections at this new role and set `mode` to `read-only`:
       "port": 5432,
       "database": "myapp_prod",
       "user": "readonly_user",
-      "password": "${PROD_READONLY_PASSWORD}",
+      "password_keychain": "dev-postgres-prod",
       "mode": "read-only",
       "sslmode": "require",
       "description": "Production — read-only role, cannot write"
@@ -356,9 +352,9 @@ This skill enforces read-only mode through hooks, regex validation, and session-
 
 ### "Password authentication failed"
 
-1. Verify the environment variable is set: `echo $DEV_POSTGRES_PASSWORD`
-2. Ensure the password matches the database user
-3. Check that `${ENV_VAR}` syntax in config matches your export
+1. Check that the Keychain service and account match the connection configuration.
+2. Ensure the stored password matches the database user and allow Keychain access when prompted.
+3. For legacy environment variables, verify they are set without printing their values.
 
 ---
 

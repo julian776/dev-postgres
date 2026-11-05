@@ -95,12 +95,10 @@ The precedence is: connection-level `require_confirmation` > global `require_con
 
 ## Password Security
 
-- Passwords in `.dev-postgres.json` use `${ENV_VAR}` syntax and are resolved at runtime
-- Never store plaintext passwords in the config file
-- `PGPASSWORD` is scoped to psql invocations only (via inline env prefix, not `export`), so child processes like python3 (used for JSON output) do not inherit it
-- For higher security, use a `.pgpass` file or `PGPASSFILE` environment variable instead
-
-**Important:** `PGPASSWORD` may briefly appear in `/proc` or `ps` output. In high-security environments, prefer `.pgpass`.
+- On macOS use `password_keychain` and create the item interactively as described in the README. Do not use `-A` or put secrets in commands.
+- Legacy plaintext and `${ENV_VAR}` passwords remain supported with a migration warning. Avoid storing secrets in project files or shell profiles.
+- Keychain reduces accidental disclosure, but an agent running with sufficient same-user access may still retrieve secrets. It is not an isolation boundary.
+- `PGPASSWORD` is passed to `psql` during execution and may be visible to sufficiently privileged local processes. `.pgpass` is also readable by the same OS user.
 
 ## Config Value Validation
 

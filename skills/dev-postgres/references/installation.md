@@ -75,16 +75,15 @@ The skill scripts check for required dependencies at runtime and provide specifi
    cp skills/dev-postgres/templates/config-example.json .dev-postgres.json
    ```
 
-3. **Edit `.dev-postgres.json`** with your connection details. Use `${ENV_VAR}` syntax for passwords. For production connections, point the host to your read replica or use the read-only user credentials.
+3. **Edit `.dev-postgres.json`** with your connection details. On macOS, set `password_keychain` to a service identifier and set `user` to the database username. For production, point to a read replica or use a read-only database role.
 
-4. **Set environment variables** for passwords:
+4. **Create the Keychain item yourself in a terminal**, using the same service and user as in the config:
 
    ```bash
-   export DEV_POSTGRES_PASSWORD="your_dev_password"
-   export PROD_POSTGRES_PASSWORD="your_prod_password"
+   security add-generic-password -s dev-postgres-dev -a your_username -w
    ```
 
-   Consider adding these to your shell profile or using a tool like `direnv`.
+   Enter the password at the prompt; do not put it in the command or use `-A`. Existing literal and `${ENV_VAR}` password configurations remain supported with a migration warning; replace `password` with `password_keychain` after creating the item. On non-macOS systems legacy password configuration remains available. Keychain reduces accidental disclosure but is not a security boundary against an agent with sufficient same-user access.
 
 5. **Add to `.gitignore`**:
 

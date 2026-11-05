@@ -49,7 +49,7 @@ bash skills/dev-postgres/scripts/pg-query.sh --query "SELECT id, name, email FRO
 
 ## Configuration
 
-Database connections are defined in `.dev-postgres.json` in the project root. Each connection has a name, credentials, and a mode (`read-only` or `read-write`).
+Database connections are defined in `.dev-postgres.json` in the project root. Each connection has a name, connection details, and a mode (`read-only` or `read-write`); passwords can be stored separately in macOS Keychain.
 
 ## Running Queries
 
@@ -128,7 +128,7 @@ All schema commands accept `--connection`, `--format`, and `--schema` options.
 2. **Respect connection modes.** Read-only connections reject all write operations.
 3. **Destructive operations** (DROP, TRUNCATE, DELETE without WHERE) require the `--confirm` flag unless the connection has `"require_confirmation": false` or the global `require_confirmation_for_destructive` is `false`.
 4. **SELECT queries** automatically get a LIMIT applied based on `max_rows` config (default 1000). Add an explicit LIMIT if you need different behavior.
-5. **Passwords** are resolved from environment variables at runtime — never hardcode them.
+5. **Passwords:** Prefer macOS Keychain via `password_keychain`. Do not inspect credential files or environment variables, retrieve secrets yourself, or ask the user to reveal them. Relay any legacy password migration warnings to the user and refer them to the README setup instructions. Legacy configurations continue to work.
 6. **Production databases must enforce read-only at the database level** — either connect to a read replica (strongest guarantee, physically cannot accept writes) or use a PostgreSQL user with only SELECT privileges. The skill's read-only enforcement is defense-in-depth, not a replacement for database-level constraints.
 
 ## Connection Switching
