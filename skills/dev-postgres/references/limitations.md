@@ -51,7 +51,7 @@ Each query opens a new `psql` connection. For high-frequency usage, this adds la
 
 ## 6. Password exposure in process list
 
-`PGPASSWORD` is scoped to psql invocations only (via inline env prefix, not `export`), so child processes like python3 do not inherit it. However, the password may still briefly appear in `/proc` or `ps` output during psql execution. For high-security environments, use a `.pgpass` file or `PGPASSFILE` environment variable instead. See security.md for details.
+`PGPASSWORD` is scoped to psql invocations only (via inline env prefix, not `export`), so child processes like python3 do not inherit it. However, the password may still briefly appear in `/proc` or `ps` output during psql execution. A `.pgpass` file or `PGPASSFILE` can avoid passing a password in the environment, but remains readable by an agent running as the same user. macOS Keychain reduces accidental exposure in project files; it does not protect against an agent with sufficient Keychain access. See security.md for details.
 
 ## 7. No SSL client certificate support
 

@@ -151,6 +151,7 @@ DB_PORT=$(echo "$CONN_JSON" | jq -r '.port // 5432')
 DB_NAME=$(echo "$CONN_JSON" | jq -r '.database // empty')
 DB_USER=$(echo "$CONN_JSON" | jq -r '.user // empty')
 DB_PASSWORD_RAW=$(echo "$CONN_JSON" | jq -r '.password // empty')
+DB_KEYCHAIN=$(echo "$CONN_JSON" | jq -r '.password_keychain // empty')
 DB_MODE=$(echo "$CONN_JSON" | jq -r '.mode // "read-only"')
 DB_SSLMODE=$(echo "$CONN_JSON" | jq -r '.sslmode // "prefer"')
 DB_SCHEMAS=$(echo "$CONN_JSON" | jq -r '.schemas // empty')
@@ -158,27 +159,6 @@ DB_SCHEMAS=$(echo "$CONN_JSON" | jq -r '.schemas // empty')
 if [[ -z "$DB_NAME" ]]; then
   echo "Error: Connection '$CONNECTION' missing required field: database" >&2
   exit 3
-fi
-
-# --- Resolve password (env var interpolation) ---
-resolve_env_var() {
-  local value="$1"
-  if [[ "$value" =~ ^\$\{([^}]+)\}$ ]]; then
-    local var_name="${BASH_REMATCH[1]}"
-    local resolved="${!var_name:-}"
-    if [[ -z "$resolved" ]]; then
-      echo "Error: Environment variable '$var_name' is not set (needed for connection '$CONNECTION' password)" >&2
-      exit 3
-    fi
-    echo "$resolved"
-  else
-    echo "$value"
-  fi
-}
-
-DB_PASSWORD=""
-if [[ -n "$DB_PASSWORD_RAW" ]]; then
-  DB_PASSWORD=$(resolve_env_var "$DB_PASSWORD_RAW")
 fi
 
 # --- Security settings ---
@@ -319,6 +299,44 @@ case "$FORMAT" in
     exit 3
     ;;
 esac
+
+# --- Resolve password (env var interpolation) ---
+resolve_env_var() {
+  local value="$1"
+  if [[ "$value" =~ ^\$\{([^}]+)\}$ ]]; then
+    local var_name="${BASH_REMATCH[1]}"
+    local resolved="${!var_name:-}"
+    if [[ -z "$resolved" ]]; then
+      echo "Error: Environment variable '$var_name' is not set (needed for connection '$CONNECTION' password)" >&2
+      exit 3
+    fi
+    echo "$resolved"
+  else
+    echo "$value"
+  fi
+}
+
+DB_PASSWORD=""
+if [[ -n "$DB_KEYCHAIN" && -n "$DB_PASSWORD_RAW" ]]; then
+  echo "Error: Connection '$CONNECTION' specifies both password and password_keychain; choose one." >&2
+  exit 3
+elif [[ -n "$DB_KEYCHAIN" ]]; then
+  if [[ "$(uname)" != "Darwin" ]] || ! command -v security >/dev/null 2>&1; then
+    echo "Error: Connection '$CONNECTION' requires macOS Keychain and the security command." >&2
+    exit 3
+  fi
+  if [[ -z "$DB_USER" ]]; then
+    echo "Error: Connection '$CONNECTION' requires a user for Keychain lookup." >&2
+    exit 3
+  fi
+  if ! DB_PASSWORD=$(security find-generic-password -s "$DB_KEYCHAIN" -a "$DB_USER" -w 2>/dev/null); then
+    echo "Error: Could not retrieve the Keychain password for connection '$CONNECTION'. Check the item and access permission." >&2
+    exit 3
+  fi
+elif [[ -n "$DB_PASSWORD_RAW" ]]; then
+  echo "Warning: Connection '$CONNECTION' uses a legacy password configuration. Migrate to macOS Keychain; see the credential migration instructions." >&2
+  DB_PASSWORD=$(resolve_env_var "$DB_PASSWORD_RAW")
+fi
 
 # --- Execute ---
 # Scope PGPASSWORD to psql invocations only (not exported to child processes like python3)
